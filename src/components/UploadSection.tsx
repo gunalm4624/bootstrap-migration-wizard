@@ -1,9 +1,9 @@
+
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Upload, FileUp, FilePlus, AlertTriangle } from "lucide-react";
 import ProgressIndicator from "@/components/ProgressIndicator";
-import { MigrationStep, MigrationStatus, MOCK_MIGRATION_RESULTS } from "@/utils/migrationTypes";
+import { MigrationStep, MigrationStatus, MigrationResults, BOOTSTRAP_CLASS_MAPPINGS, BOOTSTRAP_JS_ISSUES } from "@/utils/migrationTypes";
 import ResultsDashboard from "@/components/ResultsDashboard";
 import { useToast } from "@/hooks/use-toast";
 
@@ -14,6 +14,7 @@ const UploadSection = () => {
     step: MigrationStep.IDLE,
     progress: 0
   });
+  const [migrationResults, setMigrationResults] = useState<MigrationResults | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -48,6 +49,7 @@ const UploadSection = () => {
       step: MigrationStep.IDLE,
       progress: 0
     });
+    setMigrationResults(null);
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -73,59 +75,386 @@ const UploadSection = () => {
     fileInputRef.current?.click();
   };
 
-  const startMigration = () => {
-    setMigrationStatus({
-      step: MigrationStep.UPLOADING,
-      progress: 0,
-      detail: "Uploading your project..."
-    });
+  const startMigration = async () => {
+    if (!file) return;
 
-    const steps = [
-      { step: MigrationStep.UPLOADING, duration: 1500, detail: "Uploading your project..." },
-      { step: MigrationStep.EXTRACTING, duration: 2000, detail: "Extracting files..." },
-      { step: MigrationStep.ANALYZING, duration: 3000, detail: "Analyzing Bootstrap 3 components..." },
-      { step: MigrationStep.CONVERTING, duration: 4000, detail: "Converting to Bootstrap 5..." },
-      { step: MigrationStep.GENERATING_REPORT, duration: 2000, detail: "Generating migration report..." },
-      { step: MigrationStep.COMPLETE, duration: 0, detail: "Migration complete!" }
-    ];
+    try {
+      setMigrationStatus({
+        step: MigrationStep.UPLOADING,
+        progress: 5,
+        detail: "Uploading your project..."
+      });
 
-    let totalTime = 0;
-    let lastProgress = 0;
-
-    steps.forEach((step, index) => {
-      totalTime += step.duration;
+      await simulateProgress(15, 1000);
       
-      setTimeout(() => {
-        setMigrationStatus({
-          step: step.step,
-          progress: lastProgress,
-          detail: step.detail
-        });
+      // Extract files simulation
+      setMigrationStatus({
+        step: MigrationStep.EXTRACTING,
+        progress: 20,
+        detail: "Extracting files..."
+      });
+      
+      await simulateProgress(35, 1500);
+      
+      // Analyze files
+      setMigrationStatus({
+        step: MigrationStep.ANALYZING,
+        progress: 40,
+        detail: "Analyzing Bootstrap 3 components..."
+      });
+      
+      // Simulate file analysis result
+      const fileContents = await processFileContents(file);
+      await simulateProgress(60, 2000);
+      
+      // Convert files
+      setMigrationStatus({
+        step: MigrationStep.CONVERTING,
+        progress: 65,
+        detail: "Converting to Bootstrap 5..."
+      });
+      
+      // Perform the actual migration conversion
+      const results = performMigration(fileContents);
+      await simulateProgress(85, 2000);
+      
+      // Generate report
+      setMigrationStatus({
+        step: MigrationStep.GENERATING_REPORT,
+        progress: 90,
+        detail: "Generating migration report..."
+      });
+      
+      await simulateProgress(100, 1000);
+      
+      // Set results and complete
+      setMigrationResults(results);
+      setMigrationStatus({
+        step: MigrationStep.COMPLETE,
+        progress: 100,
+        detail: "Migration complete!"
+      });
+    } catch (error) {
+      console.error("Migration error:", error);
+      setMigrationStatus({
+        step: MigrationStep.ERROR,
+        progress: 0,
+        detail: "An error occurred during migration.",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  };
 
-        const startProgress = lastProgress;
-        const endProgress = index === steps.length - 1 ? 100 : startProgress + (100 / steps.length);
-        const stepDuration = step.duration;
-        const intervalTime = 50;
-        const totalIntervals = stepDuration / intervalTime;
-        const progressIncrement = (endProgress - startProgress) / totalIntervals;
-
-        let currentInterval = 0;
-        const progressInterval = setInterval(() => {
-          currentInterval++;
-          const currentProgress = startProgress + (progressIncrement * currentInterval);
-          
-          setMigrationStatus(prev => ({
-            ...prev,
-            progress: Math.min(currentProgress, endProgress)
-          }));
-
-          if (currentInterval >= totalIntervals) {
-            clearInterval(progressInterval);
-            lastProgress = endProgress;
-          }
-        }, intervalTime);
-      }, totalTime - step.duration);
+  const simulateProgress = (targetProgress: number, duration: number) => {
+    return new Promise<void>((resolve) => {
+      const startProgress = migrationStatus.progress;
+      const startTime = Date.now();
+      
+      const updateProgress = () => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(
+          startProgress + ((targetProgress - startProgress) * elapsed) / duration,
+          targetProgress
+        );
+        
+        setMigrationStatus(prev => ({
+          ...prev,
+          progress
+        }));
+        
+        if (elapsed < duration) {
+          requestAnimationFrame(updateProgress);
+        } else {
+          resolve();
+        }
+      };
+      
+      requestAnimationFrame(updateProgress);
     });
+  };
+
+  // Simulates processing file contents
+  const processFileContents = async (file: File): Promise<FileContent[]> => {
+    // This would normally read the ZIP file and extract contents
+    // For simulation, we'll create random contents based on file size
+    const fileCount = Math.max(3, Math.floor(file.size / 10000) % 20);
+    return Array.from({ length: fileCount }, (_, index) => {
+      const fileType = ['html', 'css', 'js', 'jsp'][Math.floor(Math.random() * 4)];
+      return {
+        fileName: `file${index + 1}.${fileType}`,
+        fileType,
+        content: generateSampleContent(fileType)
+      };
+    });
+  };
+
+  // Generate sample Bootstrap 3 content for different file types
+  const generateSampleContent = (fileType: string): string => {
+    if (fileType === 'html' || fileType === 'jsp') {
+      return `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Bootstrap 3 Example</title>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+</head>
+<body>
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col-xs-12 col-sm-6 col-md-4">
+        <div class="panel panel-primary">
+          <div class="panel-heading">
+            <h3 class="panel-title">Users List</h3>
+          </div>
+          <div class="panel-body">
+            <p class="text-left">User information goes here</p>
+            <span class="label label-default">New</span>
+            <span class="label label-primary">Update</span>
+            <div class="pull-right">
+              <button class="btn btn-default btn-xs" data-toggle="modal" data-target="#userModal">View</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4 hidden-xs">
+        <div class="well">
+          <p>Dashboard stats</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+    } else if (fileType === 'css') {
+      return `
+.navbar-default {
+  background-color: #f8f8f8;
+  border-color: #e7e7e7;
+}
+.dropdown-menu > li > a:hover {
+  background-color: #f5f5f5;
+}
+.hidden-xs {
+  display: none !important;
+}
+@media (min-width: 768px) {
+  .hidden-sm {
+    display: none !important;
+  }
+}`;
+    } else {
+      return `
+$(document).ready(function(){
+  $('.dropdown-toggle').dropdown();
+  
+  $('#myTabs a').click(function (e) {
+    e.preventDefault();
+    $(this).tab('show');
+  });
+  
+  $('.alert').alert();
+  
+  $('#myModal').modal({
+    keyboard: false,
+    backdrop: 'static'
+  });
+  
+  $('[data-toggle="tooltip"]').tooltip();
+});`;
+    }
+  };
+
+  // Process files and perform migration
+  const performMigration = (files: FileContent[]): MigrationResults => {
+    let totalClassesReplaced = 0;
+    let jsIssuesFound = 0;
+    let manualFixesNeeded = 0;
+    const warnings: any[] = [];
+    const fileSummary: any[] = [];
+
+    files.forEach(file => {
+      const fileWarnings = [];
+      let changesCount = 0;
+      let jsIssues = 0;
+
+      // Process HTML, JSP files for class replacements
+      if (file.fileType === 'html' || file.fileType === 'jsp') {
+        const { content, changes, issues } = processHTMLContent(file.content);
+        changesCount = changes;
+        jsIssues = issues.length;
+        
+        fileWarnings.push(...issues.map(issue => ({
+          type: "javascript",
+          severity: "warning",
+          message: issue.message,
+          file: file.fileName,
+          line: issue.line || 0,
+          suggestion: "Update to Bootstrap 5 JavaScript syntax"
+        })));
+      } 
+      // Process CSS files
+      else if (file.fileType === 'css') {
+        const { content, changes } = processCSSContent(file.content);
+        changesCount = changes;
+      }
+      // Process JS files for jQuery dependencies
+      else if (file.fileType === 'js') {
+        const { content, issues } = processJSContent(file.content);
+        jsIssues = issues.length;
+        
+        fileWarnings.push(...issues.map(issue => ({
+          type: "javascript",
+          severity: "warning",
+          message: issue.message,
+          file: file.fileName,
+          line: issue.line || 0,
+          suggestion: "Consider updating to native JavaScript or Bootstrap 5 components"
+        })));
+      }
+
+      totalClassesReplaced += changesCount;
+      jsIssuesFound += jsIssues;
+      
+      if (jsIssues > 0) {
+        manualFixesNeeded += Math.ceil(jsIssues / 2);
+      }
+
+      // Add to file summary
+      fileSummary.push({
+        fileName: file.fileName,
+        fileType: file.fileType,
+        changesCount,
+        jsIssues,
+        warnings: fileWarnings
+      });
+
+      // Add file warnings to global warnings
+      warnings.push(...fileWarnings);
+    });
+
+    // Add general migration warnings
+    if (jsIssuesFound > 0) {
+      warnings.unshift({
+        type: "javascript",
+        severity: "warning",
+        message: `jQuery dependency found in ${Math.min(files.length, jsIssuesFound)} files`,
+        suggestion: "Consider replacing jQuery with native JavaScript"
+      });
+    }
+
+    if (totalClassesReplaced > 0) {
+      warnings.unshift({
+        type: "structure",
+        severity: "info",
+        message: "Bootstrap 5 uses different grid breakpoints",
+        suggestion: "Review your layouts for potential breakpoint issues"
+      });
+    }
+
+    return {
+      totalFiles: files.length,
+      modifiedFiles: files.length,
+      classesReplaced: totalClassesReplaced,
+      jsIssuesFound,
+      manualFixesNeeded,
+      warnings: removeDuplicateWarnings(warnings),
+      fileSummary
+    };
+  };
+
+  // Process HTML content for class replacements and JavaScript issues
+  const processHTMLContent = (content: string) => {
+    let modifiedContent = content;
+    let changesCount = 0;
+    const issues: { message: string; line?: number }[] = [];
+    let lineNumber = 1;
+
+    // Process class replacements
+    Object.entries(BOOTSTRAP_CLASS_MAPPINGS).forEach(([bs3Class, bs5Class]) => {
+      const pattern = new RegExp(`class=["'][^"']*\\b${bs3Class}\\b[^"']*["']`, 'g');
+      const matches = content.match(pattern) || [];
+      changesCount += matches.length;
+      
+      modifiedContent = modifiedContent.replace(pattern, (match) => {
+        return match.replace(bs3Class, bs5Class);
+      });
+    });
+
+    // Find JavaScript issues
+    BOOTSTRAP_JS_ISSUES.forEach(issue => {
+      const pattern = new RegExp(issue.pattern, 'g');
+      const contentLines = content.split('\n');
+      
+      contentLines.forEach((line, index) => {
+        if (pattern.test(line)) {
+          issues.push({
+            message: issue.message,
+            line: index + 1
+          });
+        }
+      });
+    });
+
+    return { content: modifiedContent, changes: changesCount, issues };
+  };
+
+  // Process CSS content for class replacements
+  const processCSSContent = (content: string) => {
+    let modifiedContent = content;
+    let changesCount = 0;
+
+    // Replace Bootstrap 3 media queries and classes in CSS
+    Object.entries(BOOTSTRAP_CLASS_MAPPINGS).forEach(([bs3Class, bs5Class]) => {
+      // For CSS selectors using these classes
+      const pattern = new RegExp(`\\.${bs3Class}\\b`, 'g');
+      const matches = content.match(pattern) || [];
+      changesCount += matches.length;
+      
+      modifiedContent = modifiedContent.replace(pattern, `.${bs5Class}`);
+    });
+
+    return { content: modifiedContent, changes: changesCount };
+  };
+
+  // Process JavaScript content for jQuery and Bootstrap plugin issues
+  const processJSContent = (content: string) => {
+    let modifiedContent = content;
+    const issues: { message: string; line?: number }[] = [];
+    
+    // Check for jQuery and Bootstrap JS dependencies
+    BOOTSTRAP_JS_ISSUES.forEach(issue => {
+      const pattern = new RegExp(issue.pattern, 'g');
+      const contentLines = content.split('\n');
+      
+      contentLines.forEach((line, index) => {
+        if (pattern.test(line)) {
+          issues.push({
+            message: issue.message,
+            line: index + 1
+          });
+        }
+      });
+    });
+
+    return { content: modifiedContent, issues };
+  };
+
+  // Remove duplicate warnings
+  const removeDuplicateWarnings = (warnings: any[]) => {
+    const uniqueWarnings: any[] = [];
+    const warningMap = new Map();
+    
+    warnings.forEach(warning => {
+      const key = `${warning.type}-${warning.message}`;
+      if (!warningMap.has(key)) {
+        warningMap.set(key, true);
+        uniqueWarnings.push(warning);
+      }
+    });
+    
+    return uniqueWarnings;
   };
 
   const resetMigration = () => {
@@ -134,6 +463,7 @@ const UploadSection = () => {
       step: MigrationStep.IDLE,
       progress: 0
     });
+    setMigrationResults(null);
   };
 
   const downloadResults = () => {
@@ -170,9 +500,9 @@ const UploadSection = () => {
           </p>
         </div>
 
-        {migrationStatus.step === MigrationStep.COMPLETE ? (
+        {migrationStatus.step === MigrationStep.COMPLETE && migrationResults ? (
           <ResultsDashboard 
-            results={MOCK_MIGRATION_RESULTS} 
+            results={migrationResults} 
             onReset={resetMigration}
             onDownload={downloadResults}
           />
@@ -268,5 +598,12 @@ const UploadSection = () => {
     </div>
   );
 };
+
+// Define interface for file content
+interface FileContent {
+  fileName: string;
+  fileType: string;
+  content: string;
+}
 
 export default UploadSection;

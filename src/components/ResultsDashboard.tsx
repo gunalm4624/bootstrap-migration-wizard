@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Download, FileDown, RefreshCw, AlertTriangle, Check, AlertCircle, FileCode, ArrowUpRight } from "lucide-react";
 import { MigrationResults, FileSummary, MigrationWarning } from "@/utils/migrationTypes";
 
@@ -17,6 +18,7 @@ interface ResultsDashboardProps {
 
 const ResultsDashboard = ({ results, onReset, onDownload }: ResultsDashboardProps) => {
   const [activeTab, setActiveTab] = useState("summary");
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -43,6 +45,17 @@ const ResultsDashboard = ({ results, onReset, onDownload }: ResultsDashboardProp
       default:
         return "bg-gray-500/15 text-gray-700 dark:text-gray-400 border-gray-500/20";
     }
+  };
+
+  // Get warnings for a specific file
+  const getFileWarnings = (fileName: string) => {
+    const file = results.fileSummary.find(f => f.fileName === fileName);
+    return file ? file.warnings : [];
+  };
+
+  // Handle file selection for detailed view
+  const handleFileSelect = (fileName: string) => {
+    setSelectedFile(fileName === selectedFile ? null : fileName);
   };
 
   return (
@@ -186,6 +199,20 @@ const ResultsDashboard = ({ results, onReset, onDownload }: ResultsDashboardProp
                 )}
               </div>
             </div>
+
+            <div className="mb-6">
+              <h3 className="text-lg font-medium mb-3">Bootstrap 5 Changes Overview</h3>
+              <div className="rounded-lg p-4 border bg-blue-500/5 text-blue-800 dark:text-blue-200 border-blue-500/10">
+                <p className="text-sm mb-2">Major changes in Bootstrap 5 that affect your project:</p>
+                <ul className="list-disc pl-5 space-y-1 text-sm">
+                  <li>jQuery is no longer required</li>
+                  <li>Updated grid system with new responsive breakpoints</li>
+                  <li>Panels replaced with Cards</li>
+                  <li>Form controls and spacing utilities updated</li>
+                  <li>Improvements to accessibility and customization</li>
+                </ul>
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="files" className="m-0">
@@ -201,49 +228,80 @@ const ResultsDashboard = ({ results, onReset, onDownload }: ResultsDashboardProp
               
               <ScrollArea className="h-[300px]">
                 {results.fileSummary.map((file, index) => (
-                  <div 
-                    key={index}
-                    className="py-3 px-4 border-b last:border-b-0 hover:bg-muted/20 transition-colors"
-                  >
-                    <div className="grid grid-cols-12 gap-4 text-sm">
-                      <div className="col-span-5 flex items-center">
-                        <FileCode size={14} className="mr-2 text-muted-foreground" />
-                        <span className="truncate">{file.fileName}</span>
-                      </div>
-                      <div className="col-span-2">
-                        <Badge 
-                          variant="outline" 
-                          className={`${getFileTypeColor(file.fileType)}`}
-                        >
-                          {file.fileType}
-                        </Badge>
-                      </div>
-                      <div className="col-span-2 text-muted-foreground">
-                        {file.changesCount} changes
-                      </div>
-                      <div className="col-span-3">
-                        {file.jsIssues > 0 ? (
-                          <div className="flex items-center">
-                            <AlertTriangle size={14} className="mr-1 text-amber-500" />
-                            <span className="text-amber-600 dark:text-amber-400">
-                              {file.jsIssues} issues
-                            </span>
-                          </div>
-                        ) : file.warnings.length > 0 ? (
-                          <div className="flex items-center">
-                            <AlertCircle size={14} className="mr-1 text-blue-500" />
-                            <span className="text-blue-600 dark:text-blue-400">
-                              {file.warnings.length} warnings
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center">
-                            <Check size={14} className="mr-1 text-green-500" />
-                            <span className="text-green-600 dark:text-green-400">No issues</span>
-                          </div>
-                        )}
+                  <div key={index}>
+                    <div 
+                      className={`py-3 px-4 border-b hover:bg-muted/20 transition-colors cursor-pointer ${
+                        selectedFile === file.fileName ? 'bg-muted/30' : ''
+                      }`}
+                      onClick={() => handleFileSelect(file.fileName)}
+                    >
+                      <div className="grid grid-cols-12 gap-4 text-sm">
+                        <div className="col-span-5 flex items-center">
+                          <FileCode size={14} className="mr-2 text-muted-foreground" />
+                          <span className="truncate">{file.fileName}</span>
+                        </div>
+                        <div className="col-span-2">
+                          <Badge 
+                            variant="outline" 
+                            className={`${getFileTypeColor(file.fileType)}`}
+                          >
+                            {file.fileType}
+                          </Badge>
+                        </div>
+                        <div className="col-span-2 text-muted-foreground">
+                          {file.changesCount} changes
+                        </div>
+                        <div className="col-span-3">
+                          {file.jsIssues > 0 ? (
+                            <div className="flex items-center">
+                              <AlertTriangle size={14} className="mr-1 text-amber-500" />
+                              <span className="text-amber-600 dark:text-amber-400">
+                                {file.jsIssues} issues
+                              </span>
+                            </div>
+                          ) : file.warnings.length > 0 ? (
+                            <div className="flex items-center">
+                              <AlertCircle size={14} className="mr-1 text-blue-500" />
+                              <span className="text-blue-600 dark:text-blue-400">
+                                {file.warnings.length} warnings
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center">
+                              <Check size={14} className="mr-1 text-green-500" />
+                              <span className="text-green-600 dark:text-green-400">No issues</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
+                    
+                    {selectedFile === file.fileName && file.warnings.length > 0 && (
+                      <div className="py-2 px-6 bg-muted/10 border-b">
+                        <h4 className="text-xs font-medium uppercase text-muted-foreground mb-2">
+                          File Warnings
+                        </h4>
+                        <div className="space-y-2">
+                          {file.warnings.map((warning, wIndex) => (
+                            <div 
+                              key={wIndex}
+                              className={`text-xs p-2 rounded border ${getSeverityColor(warning.severity)}`}
+                            >
+                              <div className="flex items-start gap-2">
+                                <AlertTriangle size={12} className="mt-0.5 text-amber-500" />
+                                <div>
+                                  <div>{warning.message}</div>
+                                  {warning.line && <div className="mt-1">Line: {warning.line}</div>}
+                                  {warning.suggestion && (
+                                    <div className="mt-1 text-muted-foreground">{warning.suggestion}</div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </ScrollArea>

@@ -157,6 +157,21 @@ export const BOOTSTRAP_CLASS_MAPPINGS = {
   // List groups
   "list-group-item-heading": "list-group-item-heading",
   "list-group-item-text": "list-group-item-text",
+  
+  // Additional mappings
+  "navbar-inverse": "navbar-dark bg-dark",
+  "navbar-default": "navbar-light bg-light",
+  "navbar-toggle": "navbar-toggler",
+  "nav-justified": "nav-fill",
+  "dropdown-menu-right": "dropdown-menu-end",
+  "breadcrumb > li": "breadcrumb-item",
+  "carousel-control": "carousel-control-prev carousel-control-next",
+  "btn-group-justified": "d-flex w-100",
+  "img-responsive": "img-fluid",
+  "thumbnail": "img-thumbnail",
+  "caret": "dropdown-toggle-icon",
+  "dl-horizontal": "row",
+  "jumbotron": "p-5 mb-4 bg-light rounded-3"
 };
 
 /**
@@ -222,6 +237,26 @@ export const BOOTSTRAP_JS_ISSUES = [
   {
     pattern: "data-ride=",
     message: "data-ride attribute should be updated to data-bs-ride"
+  },
+  {
+    pattern: "$\\(.*\\)\\.dropdown",
+    message: "Replace jQuery dropdown with native JavaScript and data-bs-toggle"
+  },
+  {
+    pattern: "$\\(.*\\)\\.modal",
+    message: "Replace with var myModal = new bootstrap.Modal(document.getElementById('myModal'))"
+  },
+  {
+    pattern: "$\\(window\\)\\.on",
+    message: "Replace with native window.addEventListener"
+  },
+  {
+    pattern: "affix",
+    message: "The Affix plugin has been removed in Bootstrap 5"
+  },
+  {
+    pattern: "data-spy",
+    message: "Update scrollspy to use data-bs-spy instead of data-spy"
   }
 ];
 
