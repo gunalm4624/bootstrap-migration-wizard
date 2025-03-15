@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -6,7 +5,7 @@ import { Upload, FileUp, FilePlus, AlertTriangle } from "lucide-react";
 import ProgressIndicator from "@/components/ProgressIndicator";
 import { MigrationStep, MigrationStatus, MOCK_MIGRATION_RESULTS } from "@/utils/migrationTypes";
 import ResultsDashboard from "@/components/ResultsDashboard";
-import { useToast } from "@/components/ui/toast";
+import { useToast } from "@/hooks/use-toast";
 
 const UploadSection = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -26,7 +25,6 @@ const UploadSection = () => {
   };
 
   const validateAndSetFile = (selectedFile: File) => {
-    // Check if file is a zip file
     if (selectedFile.type !== "application/zip" && !selectedFile.name.endsWith(".zip")) {
       toast({
         title: "Invalid file type",
@@ -36,7 +34,6 @@ const UploadSection = () => {
       return;
     }
 
-    // Check file size (max 50MB)
     if (selectedFile.size > 50 * 1024 * 1024) {
       toast({
         title: "File too large",
@@ -77,14 +74,12 @@ const UploadSection = () => {
   };
 
   const startMigration = () => {
-    // Mock the migration process with timed status updates
     setMigrationStatus({
       step: MigrationStep.UPLOADING,
       progress: 0,
       detail: "Uploading your project..."
     });
 
-    // Simulate the migration process with a sequence of steps
     const steps = [
       { step: MigrationStep.UPLOADING, duration: 1500, detail: "Uploading your project..." },
       { step: MigrationStep.EXTRACTING, duration: 2000, detail: "Extracting files..." },
@@ -100,7 +95,6 @@ const UploadSection = () => {
     steps.forEach((step, index) => {
       totalTime += step.duration;
       
-      // Set up each step with progress updates
       setTimeout(() => {
         setMigrationStatus({
           step: step.step,
@@ -108,11 +102,10 @@ const UploadSection = () => {
           detail: step.detail
         });
 
-        // Animate progress for this step
         const startProgress = lastProgress;
         const endProgress = index === steps.length - 1 ? 100 : startProgress + (100 / steps.length);
         const stepDuration = step.duration;
-        const intervalTime = 50; // Update every 50ms
+        const intervalTime = 50;
         const totalIntervals = stepDuration / intervalTime;
         const progressIncrement = (endProgress - startProgress) / totalIntervals;
 
@@ -149,8 +142,6 @@ const UploadSection = () => {
       description: "Your migrated project is being downloaded.",
     });
     
-    // In a real implementation, this would trigger a download of the converted files
-    // For now, we'll just simulate a delay and show a success message
     setTimeout(() => {
       toast({
         title: "Download complete",
@@ -164,7 +155,6 @@ const UploadSection = () => {
       id="upload-section"
       className="relative min-h-screen py-16 px-4 overflow-hidden"
     >
-      {/* Subtle background elements */}
       <div className="absolute inset-0 -z-10 bg-white dark:bg-gray-950" />
       <div 
         className="absolute -top-[50%] left-[50%] -z-10 h-[1000px] w-[1000px] -translate-x-[50%] rounded-full bg-gradient-radial from-primary/5 to-transparent" 
