@@ -1,4 +1,3 @@
-
 /**
  * Migration process steps
  */
@@ -21,6 +20,8 @@ export interface MigrationStatus {
   progress: number; // 0-100
   detail?: string;
   error?: string;
+  currentFileName?: string; // Current file being processed
+  filesProcessed?: number; // Number of files processed
 }
 
 /**
@@ -99,6 +100,11 @@ export const BOOTSTRAP_CLASS_MAPPINGS = {
   "panel-info": "card bg-info text-white",
   "panel-warning": "card bg-warning",
   "panel-danger": "card bg-danger text-white",
+  
+  // Bootstrap 3 CDN URLs
+  "https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css": "https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css",
+  "https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js": "https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js",
+  "https://maxcdn.bootstrapcdn.com/bootstrap/3.": "https://cdn.jsdelivr.net/npm/bootstrap@5.",
   
   // Wells removed
   "well": "card card-body",

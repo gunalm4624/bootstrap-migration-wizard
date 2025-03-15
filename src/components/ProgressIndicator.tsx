@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { Progress } from "@/components/ui/progress";
-import { ArrowRight, CheckCircle2, XCircle, RefreshCw } from "lucide-react";
+import { ArrowRight, CheckCircle2, XCircle, RefreshCw, File } from "lucide-react";
 import { MigrationStatus, MigrationStep } from "@/utils/migrationTypes";
 
 interface ProgressIndicatorProps {
@@ -89,39 +89,39 @@ const ProgressIndicator = ({ status }: ProgressIndicatorProps) => {
       </div>
 
       {/* Current operation details */}
-      <div className="text-sm text-muted-foreground animate-pulse">
+      <div className="text-sm text-muted-foreground">
         {status.step === MigrationStep.UPLOADING && (
           <div className="flex items-center">
             <RefreshCw size={12} className="mr-2 animate-spin" />
-            Uploading files...
+            Uploading file: {status.currentFileName || "file.zip"}
           </div>
         )}
         
         {status.step === MigrationStep.EXTRACTING && (
           <div className="flex items-center">
             <RefreshCw size={12} className="mr-2 animate-spin" />
-            Extracting ZIP contents...
+            Extracting: {status.currentFileName || "ZIP contents..."}
           </div>
         )}
         
         {status.step === MigrationStep.ANALYZING && (
           <div className="flex items-center">
-            <RefreshCw size={12} className="mr-2 animate-spin" />
-            Scanning files for Bootstrap 3 components...
+            <File size={12} className="mr-2" />
+            Analyzing: {status.currentFileName || "Bootstrap 3 components..."}
           </div>
         )}
         
         {status.step === MigrationStep.CONVERTING && (
           <div className="flex items-center">
-            <RefreshCw size={12} className="mr-2 animate-spin" />
-            Converting Bootstrap 3 classes to Bootstrap 5...
+            <File size={12} className="mr-2" />
+            Converting: {status.currentFileName || "Bootstrap 3 to 5..."}
           </div>
         )}
         
         {status.step === MigrationStep.GENERATING_REPORT && (
           <div className="flex items-center">
             <RefreshCw size={12} className="mr-2 animate-spin" />
-            Generating migration report...
+            Generating report from {status.filesProcessed || 0} files...
           </div>
         )}
 
