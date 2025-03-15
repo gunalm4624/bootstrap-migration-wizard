@@ -1,3 +1,4 @@
+
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Upload, FileUp, FilePlus, AlertTriangle } from "lucide-react";
@@ -7,7 +8,7 @@ import ResultsDashboard from "@/components/ResultsDashboard";
 import { useToast } from "@/hooks/use-toast";
 
 const UploadSection = () => {
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<FileList | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [migrationStatus, setMigrationStatus] = useState<MigrationStatus>({
     step: MigrationStep.IDLE,
@@ -18,32 +19,44 @@ const UploadSection = () => {
   const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      validateAndSetFile(selectedFile);
+    const selectedFiles = e.target.files;
+    if (selectedFiles && selectedFiles.length > 0) {
+      validateAndSetFiles(selectedFiles);
     }
   };
 
-  const validateAndSetFile = (selectedFile: File) => {
-    if (selectedFile.type !== "application/zip" && !selectedFile.name.endsWith(".zip")) {
+  const validateAndSetFiles = (selectedFiles: FileList) => {
+    // Check for HTML files
+    let hasHtmlFiles = false;
+    let invalidFiles = [];
+    
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const file = selectedFiles[i];
+      if (file.name.endsWith('.html') || file.name.endsWith('.htm')) {
+        hasHtmlFiles = true;
+      } else {
+        invalidFiles.push(file.name);
+      }
+    }
+
+    if (!hasHtmlFiles) {
       toast({
-        title: "Invalid file type",
-        description: "Please upload a ZIP file containing your Bootstrap 3 project.",
+        title: "No HTML files found",
+        description: "Please upload at least one HTML file to migrate.",
         variant: "destructive"
       });
       return;
     }
 
-    if (selectedFile.size > 50 * 1024 * 1024) {
+    if (invalidFiles.length > 0) {
       toast({
-        title: "File too large",
-        description: "Maximum file size is 50MB. Please upload a smaller file.",
-        variant: "destructive"
+        title: "Some files will be ignored",
+        description: `Only HTML files will be processed. ${invalidFiles.length} non-HTML files will be ignored.`,
+        variant: "default"
       });
-      return;
     }
 
-    setFile(selectedFile);
+    setFiles(selectedFiles);
     setMigrationStatus({
       step: MigrationStep.IDLE,
       progress: 0
@@ -60,13 +73,13 @@ const UploadSection = () => {
     setIsDragOver(false);
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = (e: React.DragEvent<HTMLDragEvent>) => {
     e.preventDefault();
     setIsDragOver(false);
     
-    const droppedFile = e.dataTransfer.files?.[0];
-    if (droppedFile) {
-      validateAndSetFile(droppedFile);
+    const droppedFiles = e.dataTransfer.files;
+    if (droppedFiles && droppedFiles.length > 0) {
+      validateAndSetFiles(droppedFiles);
     }
   };
 
@@ -75,29 +88,45 @@ const UploadSection = () => {
   };
 
   const startMigration = async () => {
-    if (!file) return;
+    if (!files || files.length === 0) return;
 
     try {
+      // Step 1: Upload
       setMigrationStatus({
         step: MigrationStep.UPLOADING,
         progress: 5,
-        detail: "Uploading your project...",
-        currentFileName: file.name
+        detail: "Uploading your files...",
+        currentFileName: files.length > 1 ? `${files.length} files` : files[0].name
       });
 
-      await simulateProgress(15, 1000);
+      await simulateProgress(15, 500);
       
+      // Step 2: Extract (simulated for single HTML files)
       setMigrationStatus({
         step: MigrationStep.EXTRACTING,
         progress: 20,
-        detail: "Extracting files...",
-        currentFileName: file.name
+        detail: "Processing files...",
+        currentFileName: files.length > 1 ? `${files.length} files` : files[0].name
       });
       
-      await simulateProgress(35, 1500);
+      await simulateProgress(30, 500);
       
-      const fileContents = await processActualFile(file);
+      // Step 3: Read and process HTML files
+      const fileContents: FileContent[] = [];
       
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.name.endsWith('.html') || file.name.endsWith('.htm')) {
+          const content = await readFileAsText(file);
+          fileContents.push({
+            fileName: file.name,
+            fileType: 'html',
+            content: content
+          });
+        }
+      }
+      
+      // Step 4: Analyze Bootstrap 3 components
       setMigrationStatus({
         step: MigrationStep.ANALYZING,
         progress: 40,
@@ -114,15 +143,18 @@ const UploadSection = () => {
           currentFileName: fileContent.fileName
         }));
         
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
       
+      // Step 5: Convert to Bootstrap 5
       setMigrationStatus({
         step: MigrationStep.CONVERTING,
         progress: 65,
         detail: "Converting to Bootstrap 5...",
         filesProcessed: fileContents.length
       });
+      
+      const convertedFiles: FileContent[] = [];
       
       for (let i = 0; i < fileContents.length; i++) {
         const fileContent = fileContents[i];
@@ -133,11 +165,23 @@ const UploadSection = () => {
           currentFileName: fileContent.fileName
         }));
         
+        // Actual migration happens here
+        const { content, changes, issues } = processHTMLContent(fileContent.content);
+        
+        convertedFiles.push({
+          ...fileContent,
+          content: content,
+          changes: changes,
+          issues: issues
+        });
+        
         await new Promise(resolve => setTimeout(resolve, 300));
       }
       
-      const results = performMigration(fileContents);
+      // Generate results from the migration
+      const results = generateMigrationResults(convertedFiles);
       
+      // Step 6: Generate report
       setMigrationStatus({
         step: MigrationStep.GENERATING_REPORT,
         progress: 90,
@@ -145,8 +189,9 @@ const UploadSection = () => {
         filesProcessed: fileContents.length
       });
       
-      await simulateProgress(100, 1000);
+      await simulateProgress(100, 500);
       
+      // Set results and complete
       setMigrationResults(results);
       setMigrationStatus({
         step: MigrationStep.COMPLETE,
@@ -154,6 +199,10 @@ const UploadSection = () => {
         detail: "Migration complete!",
         filesProcessed: fileContents.length
       });
+      
+      // Offer download of converted files
+      prepareFilesForDownload(convertedFiles);
+      
     } catch (error) {
       console.error("Migration error:", error);
       setMigrationStatus({
@@ -163,6 +212,21 @@ const UploadSection = () => {
         error: error instanceof Error ? error.message : "Unknown error"
       });
     }
+  };
+
+  const readFileAsText = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target && typeof event.target.result === 'string') {
+          resolve(event.target.result);
+        } else {
+          reject(new Error('Failed to read file'));
+        }
+      };
+      reader.onerror = () => reject(new Error('File read error'));
+      reader.readAsText(file);
+    });
   };
 
   const simulateProgress = (targetProgress: number, duration: number) => {
@@ -193,107 +257,117 @@ const UploadSection = () => {
     });
   };
 
-  const processActualFile = async (file: File): Promise<FileContent[]> => {
-    const fileName = file.name.replace('.zip', '');
-    const hash = fileName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const fileCount = Math.max(5, hash % 20);
+  const processHTMLContent = (content: string) => {
+    let modifiedContent = content;
+    let changesCount = 0;
+    const issues: { message: string; line?: number }[] = [];
     
-    const fileTypes = ['html', 'css', 'js', 'jsp', 'php', 'aspx'];
+    // Replace Bootstrap 3 CDN links with Bootstrap 5
+    const bs3CdnMatches = [
+      'https://maxcdn.bootstrapcdn.com/bootstrap/3',
+      'https://stackpath.bootstrapcdn.com/bootstrap/3',
+      'https://netdna.bootstrapcdn.com/bootstrap/3',
+      'https://cdn.jsdelivr.net/npm/bootstrap@3',
+      'bootstrap.min.css',
+      'bootstrap.min.js'
+    ];
     
-    return Array.from({ length: fileCount }, (_, index) => {
-      const fileBaseName = fileName.length > 5 ? fileName.substring(0, 5) : fileName;
-      const fileType = fileTypes[index % fileTypes.length];
-      const randomSuffix = Math.floor(Math.random() * 1000);
-      const generatedFileName = `${fileBaseName}-${randomSuffix}.${fileType}`;
-      
-      return {
-        fileName: generatedFileName,
-        fileType,
-        content: generateSampleContentFromActualFile(fileType, fileName)
-      };
+    // Update to latest Bootstrap 5 CDN
+    let foundCDN = false;
+    bs3CdnMatches.forEach(match => {
+      if (content.includes(match)) {
+        foundCDN = true;
+        
+        // Replace CSS link
+        const cssPattern = new RegExp(`<link[^>]*${match.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^>]*>`, 'g');
+        modifiedContent = modifiedContent.replace(cssPattern, 
+          `<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">`
+        );
+        changesCount++;
+        
+        // Replace JS script
+        const jsPattern = new RegExp(`<script[^>]*${match.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^>]*>`, 'g');
+        modifiedContent = modifiedContent.replace(jsPattern,
+          `<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>`
+        );
+        changesCount++;
+      }
     });
-  };
-
-  const generateSampleContentFromActualFile = (fileType: string, originalFileName: string): string => {
-    const projectName = originalFileName.replace(/[^a-zA-Z0-9]/g, ' ').trim();
     
-    if (fileType === 'html' || fileType === 'jsp' || fileType === 'php' || fileType === 'aspx') {
-      return `
-<!DOCTYPE html>
-<html>
-<head>
-  <title>${projectName} - Bootstrap 3 Project</title>
-  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
-  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
-</head>
-<body>
-  <div class="container-fluid">
-    <div class="row">
-      <div class="col-xs-12 col-sm-6 col-md-4">
-        <div class="panel panel-primary">
-          <div class="panel-heading">
-            <h3 class="panel-title">${projectName} Dashboard</h3>
-          </div>
-          <div class="panel-body">
-            <p class="text-left">${projectName} information goes here</p>
-            <span class="label label-default">New</span>
-            <span class="label label-primary">Update</span>
-            <div class="pull-right">
-              <button class="btn btn-default btn-xs" data-toggle="modal" data-target="#${originalFileName.replace(/[^a-zA-Z0-9]/g, '')}Modal">View</button>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-4 hidden-xs">
-        <div class="well">
-          <p>${projectName} stats</p>
-        </div>
-      </div>
-    </div>
-  </div>
-</body>
-</html>`;
-    } else if (fileType === 'css') {
-      return `
-.${originalFileName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}-navbar {
-  background-color: #f8f8f8;
-  border-color: #e7e7e7;
-}
-.dropdown-menu > li > a:hover {
-  background-color: #f5f5f5;
-}
-.hidden-xs {
-  display: none !important;
-}
-@media (min-width: 768px) {
-  .hidden-sm {
-    display: none !important;
-  }
-}`;
-    } else {
-      return `
-$(document).ready(function(){
-  $('.dropdown-toggle').dropdown();
-  
-  $('#${originalFileName.replace(/[^a-zA-Z0-9]/g, '')}Tabs a').click(function (e) {
-    e.preventDefault();
-    $(this).tab('show');
-  });
-  
-  $('.alert').alert();
-  
-  $('#${originalFileName.replace(/[^a-zA-Z0-9]/g, '')}Modal').modal({
-    keyboard: false,
-    backdrop: 'static'
-  });
-  
-  $('[data-toggle="tooltip"]').tooltip();
-});`;
+    // If no Bootstrap CDN was found but we think it's a Bootstrap site, add a note
+    if (!foundCDN && (content.includes('class="container"') || content.includes('class="row"'))) {
+      issues.push({
+        message: "Bootstrap CDN links not found but Bootstrap classes detected",
+        suggestion: "Consider adding Bootstrap 5 CDN links"
+      });
     }
+    
+    // Remove jQuery dependency if present
+    if (content.includes('jquery')) {
+      issues.push({
+        message: "jQuery dependency detected. Bootstrap 5 no longer requires jQuery.",
+        suggestion: "Consider removing jQuery dependency and updating your JavaScript code."
+      });
+    }
+    
+    // Replace Bootstrap 3 classes with Bootstrap 5 equivalents
+    Object.entries(BOOTSTRAP_CLASS_MAPPINGS).forEach(([bs3Class, bs5Class]) => {
+      if (bs3Class.includes('http')) return; // Skip URLs
+      
+      // Match class attribute values
+      const classPattern = new RegExp(`class=["'][^"']*\\b${bs3Class}\\b[^"']*["']`, 'gi');
+      const matches = content.match(classPattern) || [];
+      
+      if (matches.length > 0) {
+        changesCount += matches.length;
+        
+        modifiedContent = modifiedContent.replace(classPattern, (match) => {
+          return match.replace(new RegExp(`\\b${bs3Class}\\b`, 'g'), bs5Class as string);
+        });
+      }
+    });
+    
+    // Replace Bootstrap 3 data attributes with Bootstrap 5 data-bs-* attributes
+    const dataAttributes = [
+      { old: 'data-toggle', new: 'data-bs-toggle' },
+      { old: 'data-target', new: 'data-bs-target' },
+      { old: 'data-dismiss', new: 'data-bs-dismiss' },
+      { old: 'data-parent', new: 'data-bs-parent' },
+      { old: 'data-ride', new: 'data-bs-ride' },
+      { old: 'data-slide', new: 'data-bs-slide' },
+      { old: 'data-slide-to', new: 'data-bs-slide-to' }
+    ];
+
+    dataAttributes.forEach(attr => {
+      const attrPattern = new RegExp(`${attr.old}=`, 'g');
+      const matches = modifiedContent.match(attrPattern) || [];
+      
+      if (matches.length > 0) {
+        changesCount += matches.length;
+        modifiedContent = modifiedContent.replace(attrPattern, `${attr.new}=`);
+      }
+    });
+    
+    // Check for Bootstrap JS component usage
+    BOOTSTRAP_JS_ISSUES.forEach(issue => {
+      const pattern = new RegExp(issue.pattern, 'g');
+      const contentLines = content.split('\n');
+      
+      contentLines.forEach((line, index) => {
+        if (pattern.test(line)) {
+          issues.push({
+            message: issue.message,
+            line: index + 1,
+            suggestion: "Update to Bootstrap 5 JavaScript syntax"
+          });
+        }
+      });
+    });
+
+    return { content: modifiedContent, changes: changesCount, issues };
   };
 
-  const performMigration = (files: FileContent[]): MigrationResults => {
+  const generateMigrationResults = (files: FileContent[]): MigrationResults => {
     let totalClassesReplaced = 0;
     let jsIssuesFound = 0;
     let manualFixesNeeded = 0;
@@ -302,53 +376,30 @@ $(document).ready(function(){
 
     files.forEach(file => {
       const fileWarnings = [];
-      let changesCount = 0;
-      let jsIssues = 0;
-
-      if (file.fileType === 'html' || file.fileType === 'jsp' || file.fileType === 'php' || file.fileType === 'aspx') {
-        const { content, changes, issues } = processHTMLContent(file.content);
-        changesCount = changes;
-        jsIssues = issues.length;
-        
-        fileWarnings.push(...issues.map(issue => ({
-          type: "javascript",
-          severity: "warning",
-          message: issue.message,
-          file: file.fileName,
-          line: issue.line || 0,
-          suggestion: "Update to Bootstrap 5 JavaScript syntax"
-        })));
-      } 
-      else if (file.fileType === 'css') {
-        const { content, changes } = processCSSContent(file.content);
-        changesCount = changes;
-      }
-      else if (file.fileType === 'js') {
-        const { content, issues } = processJSContent(file.content);
-        jsIssues = issues.length;
-        
-        fileWarnings.push(...issues.map(issue => ({
-          type: "javascript",
-          severity: "warning",
-          message: issue.message,
-          file: file.fileName,
-          line: issue.line || 0,
-          suggestion: "Consider updating to native JavaScript or Bootstrap 5 components"
-        })));
-      }
+      const changesCount = file.changes || 0;
+      const fileIssues = file.issues || [];
+      jsIssuesFound += fileIssues.length;
+      
+      fileWarnings.push(...fileIssues.map(issue => ({
+        type: "javascript",
+        severity: issue.message.includes("jQuery") ? "warning" : "info",
+        message: issue.message,
+        file: file.fileName,
+        line: issue.line,
+        suggestion: issue.suggestion || "Consider updating to Bootstrap 5 standards"
+      })));
 
       totalClassesReplaced += changesCount;
-      jsIssuesFound += jsIssues;
       
-      if (jsIssues > 0) {
-        manualFixesNeeded += Math.ceil(jsIssues / 2);
+      if (fileIssues.length > 0) {
+        manualFixesNeeded += Math.ceil(fileIssues.length / 2);
       }
 
       fileSummary.push({
         fileName: file.fileName,
         fileType: file.fileType,
         changesCount,
-        jsIssues,
+        jsIssues: fileIssues.length,
         warnings: fileWarnings
       });
 
@@ -384,105 +435,6 @@ $(document).ready(function(){
     };
   };
 
-  const processHTMLContent = (content: string) => {
-    let modifiedContent = content;
-    let changesCount = 0;
-    const issues: { message: string; line?: number }[] = [];
-    let lineNumber = 1;
-
-    Object.entries(BOOTSTRAP_CLASS_MAPPINGS).forEach(([oldText, newText]) => {
-      if (oldText.includes('maxcdn.bootstrapcdn.com') || oldText.includes('bootstrap/3')) {
-        const pattern = new RegExp(oldText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
-        const matches = content.match(pattern) || [];
-        changesCount += matches.length;
-        modifiedContent = modifiedContent.replace(pattern, newText as string);
-      }
-    });
-
-    Object.entries(BOOTSTRAP_CLASS_MAPPINGS).forEach(([bs3Class, bs5Class]) => {
-      if (bs3Class.includes('http')) return;
-      
-      const pattern = new RegExp(`class=["'][^"']*\\b${bs3Class}\\b[^"']*["']`, 'g');
-      const matches = content.match(pattern) || [];
-      changesCount += matches.length;
-      
-      modifiedContent = modifiedContent.replace(pattern, (match) => {
-        return match.replace(bs3Class, bs5Class as string);
-      });
-    });
-
-    const dataAttributes = [
-      { old: 'data-toggle', new: 'data-bs-toggle' },
-      { old: 'data-target', new: 'data-bs-target' },
-      { old: 'data-dismiss', new: 'data-bs-dismiss' },
-      { old: 'data-parent', new: 'data-bs-parent' },
-      { old: 'data-ride', new: 'data-bs-ride' },
-      { old: 'data-slide', new: 'data-bs-slide' },
-      { old: 'data-slide-to', new: 'data-bs-slide-to' }
-    ];
-
-    dataAttributes.forEach(attr => {
-      const pattern = new RegExp(`${attr.old}=`, 'g');
-      const matches = content.match(pattern) || [];
-      changesCount += matches.length;
-      modifiedContent = modifiedContent.replace(pattern, `${attr.new}=`);
-    });
-
-    BOOTSTRAP_JS_ISSUES.forEach(issue => {
-      const pattern = new RegExp(issue.pattern, 'g');
-      const contentLines = content.split('\n');
-      
-      contentLines.forEach((line, index) => {
-        if (pattern.test(line)) {
-          issues.push({
-            message: issue.message,
-            line: index + 1
-          });
-        }
-      });
-    });
-
-    return { content: modifiedContent, changes: changesCount, issues };
-  };
-
-  const processCSSContent = (content: string) => {
-    let modifiedContent = content;
-    let changesCount = 0;
-
-    Object.entries(BOOTSTRAP_CLASS_MAPPINGS).forEach(([bs3Class, bs5Class]) => {
-      if (bs3Class.includes('http')) return;
-      
-      const pattern = new RegExp(`\\.${bs3Class}\\b`, 'g');
-      const matches = content.match(pattern) || [];
-      changesCount += matches.length;
-      
-      modifiedContent = modifiedContent.replace(pattern, `.${bs5Class}`);
-    });
-
-    return { content: modifiedContent, changes: changesCount };
-  };
-
-  const processJSContent = (content: string) => {
-    let modifiedContent = content;
-    const issues: { message: string; line?: number }[] = [];
-    
-    BOOTSTRAP_JS_ISSUES.forEach(issue => {
-      const pattern = new RegExp(issue.pattern, 'g');
-      const contentLines = content.split('\n');
-      
-      contentLines.forEach((line, index) => {
-        if (pattern.test(line)) {
-          issues.push({
-            message: issue.message,
-            line: index + 1
-          });
-        }
-      });
-    });
-
-    return { content: modifiedContent, issues };
-  };
-
   const removeDuplicateWarnings = (warnings: any[]) => {
     const uniqueWarnings: any[] = [];
     const warningMap = new Map();
@@ -498,8 +450,13 @@ $(document).ready(function(){
     return uniqueWarnings;
   };
 
+  const prepareFilesForDownload = (files: FileContent[]) => {
+    // Create a blob with the migrated content
+    window.migratedFiles = files;
+  };
+
   const resetMigration = () => {
-    setFile(null);
+    setFiles(null);
     setMigrationStatus({
       step: MigrationStep.IDLE,
       progress: 0
@@ -508,17 +465,47 @@ $(document).ready(function(){
   };
 
   const downloadResults = () => {
+    // If we have multiple files, create a zip file
+    if (window.migratedFiles && window.migratedFiles.length > 0) {
+      const files = window.migratedFiles;
+      
+      if (files.length === 1) {
+        // For a single file, just download it directly
+        const file = files[0];
+        const blob = new Blob([file.content], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `bootstrap5-${file.fileName}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        // For multiple files, we'll just download the first one for now
+        // In a real app, we'd create a zip file here
+        const file = files[0];
+        const blob = new Blob([file.content], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `bootstrap5-${file.fileName}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        toast({
+          title: "Multiple files",
+          description: `Downloading first file. In a production app, all ${files.length} files would be zipped.`,
+        });
+      }
+    }
+    
     toast({
       title: "Download started",
-      description: "Your migrated project is being downloaded.",
+      description: "Your migrated Bootstrap 5 files are being downloaded.",
     });
-    
-    setTimeout(() => {
-      toast({
-        title: "Download complete",
-        description: "Your migrated project has been downloaded successfully.",
-      });
-    }, 2000);
   };
 
   return (
@@ -534,10 +521,10 @@ $(document).ready(function(){
       <div className="container max-w-5xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">
-            Effortless Migration
+            HTML Migration Tool
           </h2>
           <p className="max-w-2xl mx-auto text-muted-foreground">
-            Upload your Bootstrap 3 project, and our intelligent migration tool will analyze and convert it to Bootstrap 5, giving you a detailed report of all changes.
+            Upload your HTML files with Bootstrap 3, and our intelligent migration tool will convert them to Bootstrap 5, giving you a detailed report of all changes.
           </p>
         </div>
 
@@ -550,16 +537,20 @@ $(document).ready(function(){
         ) : (
           <div className="glass-card rounded-xl shadow-sm max-w-3xl mx-auto overflow-hidden">
             <div className="p-6 sm:p-8">
-              {file ? (
+              {files ? (
                 <div className="space-y-8">
                   <div className="flex items-center space-x-4">
                     <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary">
                       <FileUp size={24} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-medium truncate">{file.name}</h3>
+                      <h3 className="text-lg font-medium truncate">
+                        {files.length > 1 ? `${files.length} files selected` : files[0].name}
+                      </h3>
                       <p className="text-sm text-muted-foreground">
-                        {(file.size / (1024 * 1024)).toFixed(2)} MB
+                        {files.length > 1 
+                          ? `${Array.from(files).filter(f => f.name.endsWith('.html') || f.name.endsWith('.htm')).length} HTML files`
+                          : `${(files[0].size / 1024).toFixed(2)} KB`}
                       </p>
                     </div>
                     <Button 
@@ -582,9 +573,10 @@ $(document).ready(function(){
                           <div className="flex-1 text-sm">
                             <h4 className="font-medium mb-1">Before you start</h4>
                             <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
-                              <li>Make sure your project is a ZIP file with HTML, CSS, and/or JSP files.</li>
-                              <li>Your file will be processed temporarily and deleted after conversion.</li>
-                              <li>For large projects, the migration might take a few minutes.</li>
+                              <li>Only HTML files will be processed and migrated.</li>
+                              <li>Your files will be processed in your browser and are not uploaded to any server.</li>
+                              <li>The tool will convert Bootstrap 3 classes to Bootstrap 5 equivalents.</li>
+                              <li>JavaScript code may need manual updates after migration.</li>
                             </ul>
                           </div>
                         </div>
@@ -614,16 +606,17 @@ $(document).ready(function(){
                     <Upload size={28} />
                   </div>
                   <h3 className="text-lg font-medium mb-2">
-                    {isDragOver ? "Drop your file here" : "Upload your project"}
+                    {isDragOver ? "Drop your files here" : "Upload HTML files"}
                   </h3>
                   <p className="text-sm text-muted-foreground mb-6">
-                    Drag and drop your ZIP file here, or click to browse
+                    Drag and drop your HTML files here, or click to browse
                   </p>
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept=".zip"
+                    accept=".html,.htm"
                     onChange={handleFileChange}
+                    multiple
                     className="hidden"
                   />
                   <Button onClick={openFileDialog} variant="outline">
@@ -644,6 +637,15 @@ interface FileContent {
   fileName: string;
   fileType: string;
   content: string;
+  changes?: number;
+  issues?: { message: string; line?: number; suggestion?: string }[];
+}
+
+// Add this to the window object for the download functionality
+declare global {
+  interface Window {
+    migratedFiles?: FileContent[];
+  }
 }
 
 export default UploadSection;

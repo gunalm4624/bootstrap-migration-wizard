@@ -100,14 +100,14 @@ const ProgressIndicator = ({ status }: ProgressIndicatorProps) => {
         {status.step === MigrationStep.EXTRACTING && (
           <div className="flex items-center">
             <RefreshCw size={12} className="mr-2 animate-spin" />
-            Extracting: {status.currentFileName || "ZIP contents..."}
+            Extracting: {status.currentFileName || "files..."}
           </div>
         )}
         
         {status.step === MigrationStep.ANALYZING && (
           <div className="flex items-center">
             <File size={12} className="mr-2" />
-            Analyzing: {status.currentFileName || "Bootstrap 3 components..."}
+            Analyzing: {status.currentFileName || "HTML file..."}
           </div>
         )}
         
