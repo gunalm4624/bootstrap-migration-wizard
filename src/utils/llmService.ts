@@ -1,5 +1,6 @@
 import { toast } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
+import { ToastActionElement } from "@/components/ui/toast";
+import { renderToastApiKeyAction } from "@/utils/ToastApiKeyAction";
 
 // Using OpenAI API for improved migration quality
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
@@ -129,32 +130,13 @@ function promptForAPIKey() {
       title: "OpenAI API Key Required",
       description: "Please enter your OpenAI API key in the settings to enable AI-powered migration.",
       variant: "default",
-      action: createApiKeyAction(),
+      action: renderToastApiKeyAction((apiKey) => {
+        localStorage.setItem('openai_api_key', apiKey);
+        window.location.reload();
+      }) as unknown as ToastActionElement,
       duration: 10000,
     });
   }, 1000);
-}
-
-// Function to create the action element for the toast
-function createApiKeyAction() {
-  // Create a button element programmatically
-  const button = document.createElement('button');
-  button.textContent = 'Enter API Key';
-  button.className = 'bg-primary text-white px-3 py-1 rounded text-xs';
-  button.onclick = () => {
-    const apiKey = prompt("Enter your OpenAI API key:");
-    if (apiKey) {
-      localStorage.setItem('openai_api_key', apiKey);
-      window.location.reload();
-    }
-  };
-  
-  // Wrap in a div for layout
-  const container = document.createElement('div');
-  container.className = 'flex items-center';
-  container.appendChild(button);
-  
-  return container;
 }
 
 // This function simulates an LLM response based on pattern matching
@@ -193,8 +175,32 @@ async function simulateLLMResponse(
 function convertBootstrapModal(html: string): string {
   let convertedHTML = html;
   
+  // Comprehensive CDN replacement (improved)
+  const cdnPatterns = [
+    // CSS CDN patterns
+    {
+      pattern: /<link[^>]*href=["'](https?:\/\/(?:maxcdn|stackpath|netdna|cdn)\.bootstrapcdn\.com\/bootstrap\/3[^"']*|https?:\/\/cdn\.jsdelivr\.net\/(?:npm|bootstrap)\/bootstrap@3[^"']*)["'][^>]*>/gi,
+      replacement: '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">'
+    },
+    // JavaScript CDN patterns
+    {
+      pattern: /<script[^>]*src=["'](https?:\/\/(?:maxcdn|stackpath|netdna|cdn)\.bootstrapcdn\.com\/bootstrap\/3[^"']*|https?:\/\/cdn\.jsdelivr\.net\/(?:npm|bootstrap)\/bootstrap@3[^"']*)["'][^>]*>/gi,
+      replacement: '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>'
+    },
+    // jQuery removal suggestion with Bootstrap 5 (No direct replacement as BS5 doesn't need jQuery)
+    {
+      pattern: /<script[^>]*src=["']https?:\/\/(?:code\.jquery\.com\/jquery|cdnjs\.cloudflare\.com\/ajax\/libs\/jquery)[^"']*["'][^>]*>/gi,
+      replacement: '<!-- Bootstrap 5 does not require jQuery - Removed jQuery dependency -->'
+    }
+  ];
+  
+  // Apply all CDN replacements
+  cdnPatterns.forEach(({ pattern, replacement }) => {
+    convertedHTML = convertedHTML.replace(pattern, replacement);
+  });
+  
   // Fix modal headers (one of the key differences between Bootstrap 3 and 5)
-  const modalHeaderRegex = /<div class=["']modal-header["']>([\s\S]*?)<button[\s\S]*?class=["'](?:.*?)close(?:.*?)["'][\s\S]*?data-dismiss=["']modal["'][\s\S]*?>[\s\S]*?<\/button>([\s\S]*?)<h\d[\s\S]*?class=["'](?:.*?)modal-title(?:.*?)["'][\s\S]*?>([\s\S]*?)<\/h\d>([\s\S]*?)<\/div>/g;
+  const modalHeaderRegex = /<div class=["']modal-header["']>[\s\S]*?<button[\s\S]*?class=["'][^"']*close[^"']*["'][\s\S]*?data-dismiss=["']modal["'][\s\S]*?>[\s\S]*?<\/button>[\s\S]*?<h\d[\s\S]*?class=["'](?:.*?)modal-title(?:.*?)["'][\s\S]*?>([\s\S]*?)<\/h\d>([\s\S]*?)<\/div>/g;
   
   convertedHTML = convertedHTML.replace(modalHeaderRegex, (match, beforeBtn, betweenBtnAndTitle, titleContent, afterTitle) => {
     return `<div class="modal-header">
@@ -213,19 +219,36 @@ function convertBootstrapModal(html: string): string {
   // Change button styles
   convertedHTML = convertedHTML.replace(/class=["']([^"']*)btn-default([^"']*)["']/g, 'class="$1btn-secondary$2"');
   
-  // Fix links
+  // Fix links - Enhanced navbar and navigation components handling
   convertedHTML = convertedHTML.replace(/class=["']([^"']*)navbar-toggle([^"']*)["']/g, 'class="$1navbar-toggler$2"');
   convertedHTML = convertedHTML.replace(/class=["']([^"']*)nav-stacked([^"']*)["']/g, 'class="$1flex-column$2"');
+  convertedHTML = convertedHTML.replace(/class=["']([^"']*)navbar-inverse([^"']*)["']/g, 'class="$1navbar-dark bg-dark$2"');
+  convertedHTML = convertedHTML.replace(/class=["']([^"']*)navbar-default([^"']*)["']/g, 'class="$1navbar-light bg-light$2"');
   
   // Fix link elements (a tags with Bootstrap classes)
   convertedHTML = convertedHTML.replace(/<a([^>]*)class=["']([^"']*)(btn-default)([^"']*)["']([^>]*)>/g, '<a$1class="$2btn-secondary$4"$5>');
   convertedHTML = convertedHTML.replace(/<a([^>]*)class=["']([^"']*)(navbar-brand)([^"']*)["']([^>]*)>/g, '<a$1class="$2navbar-brand$4"$5>');
   
+  // Fix dropdown components
+  convertedHTML = convertedHTML.replace(/data-toggle=["']dropdown["']/g, 'data-bs-toggle="dropdown"');
+  convertedHTML = convertedHTML.replace(/class=["']([^"']*)dropdown-menu-right([^"']*)["']/g, 'class="$1dropdown-menu-end$2"');
+  
   // Fix special cases for links in navbars
   convertedHTML = convertedHTML.replace(/<ul class=["']nav navbar-nav["']/g, '<ul class="navbar-nav">');
   convertedHTML = convertedHTML.replace(/<li([^>]*)class=["']([^"']*)active([^"']*)["']([^>]*)>/g, '<li$1class="$2active nav-item$3"$4>');
   convertedHTML = convertedHTML.replace(/<li([^>]*)>/g, '<li$1 class="nav-item">');
-  convertedHTML = convertedHTML.replace(/<a([^>]*)class=["']([^"']*)"([^>]*)>/g, '<a$1class="$2 nav-link"$3>');
+  
+  // Add nav-link to navbar links that don't have it
+  const navbarLinkRegex = /<ul class=["']navbar-nav["'][^>]*>[\s\S]*?<li[^>]*class=["'][^"']*nav-item[^"']*["'][^>]*>[\s\S]*?<a([^>]*)class=["']([^"']*?)["']([^>]*)>/g;
+  convertedHTML = convertedHTML.replace(navbarLinkRegex, (match, before, classes, after) => {
+    if (!classes.includes('nav-link')) {
+      return match.replace(
+        `class="${classes}"`, 
+        `class="${classes} nav-link"`
+      );
+    }
+    return match;
+  });
   
   return convertedHTML;
 }
