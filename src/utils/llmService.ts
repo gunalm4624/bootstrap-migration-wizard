@@ -1,5 +1,5 @@
-
 import { toast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 
 // Using OpenAI API for improved migration quality
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
@@ -129,25 +129,32 @@ function promptForAPIKey() {
       title: "OpenAI API Key Required",
       description: "Please enter your OpenAI API key in the settings to enable AI-powered migration.",
       variant: "default",
-      action: (
-        <div className="flex items-center">
-          <button 
-            onClick={() => {
-              const apiKey = prompt("Enter your OpenAI API key:");
-              if (apiKey) {
-                localStorage.setItem('openai_api_key', apiKey);
-                window.location.reload();
-              }
-            }}
-            className="bg-primary text-white px-3 py-1 rounded text-xs"
-          >
-            Enter API Key
-          </button>
-        </div>
-      ),
+      action: createApiKeyAction(),
       duration: 10000,
     });
   }, 1000);
+}
+
+// Function to create the action element for the toast
+function createApiKeyAction() {
+  // Create a button element programmatically
+  const button = document.createElement('button');
+  button.textContent = 'Enter API Key';
+  button.className = 'bg-primary text-white px-3 py-1 rounded text-xs';
+  button.onclick = () => {
+    const apiKey = prompt("Enter your OpenAI API key:");
+    if (apiKey) {
+      localStorage.setItem('openai_api_key', apiKey);
+      window.location.reload();
+    }
+  };
+  
+  // Wrap in a div for layout
+  const container = document.createElement('div');
+  container.className = 'flex items-center';
+  container.appendChild(button);
+  
+  return container;
 }
 
 // This function simulates an LLM response based on pattern matching
