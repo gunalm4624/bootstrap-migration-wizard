@@ -36,6 +36,7 @@ export interface MigrationResults {
   manualFixesNeeded: number;
   warnings: MigrationWarning[];
   fileSummary: FileSummary[];
+  aiAssisted?: boolean; // New flag to indicate AI assistance
 }
 
 /**
@@ -47,13 +48,14 @@ export interface FileSummary {
   changesCount: number;
   jsIssues: number;
   warnings: MigrationWarning[];
+  aiAnalysis?: string; // New field for AI analysis
 }
 
 /**
  * A specific migration warning
  */
 export interface MigrationWarning {
-  type: "class" | "javascript" | "structure";
+  type: "class" | "javascript" | "structure" | "ai-analysis" | "ai-assistance"; // Added AI types
   severity: "info" | "warning" | "error";
   message: string;
   file?: string;

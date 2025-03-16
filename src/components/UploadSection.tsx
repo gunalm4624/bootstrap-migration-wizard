@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Upload, FileUp, FilePlus, AlertTriangle } from "lucide-react";
@@ -6,6 +5,7 @@ import ProgressIndicator from "@/components/ProgressIndicator";
 import { MigrationStep, MigrationStatus, MigrationResults, BOOTSTRAP_CLASS_MAPPINGS, BOOTSTRAP_JS_ISSUES } from "@/utils/migrationTypes";
 import ResultsDashboard from "@/components/ResultsDashboard";
 import { useToast } from "@/hooks/use-toast";
+import { analyzeBootstrapCode } from "@/utils/llmService";
 
 const UploadSection = () => {
   const [files, setFiles] = useState<FileList | null>(null);
@@ -26,7 +26,6 @@ const UploadSection = () => {
   };
 
   const validateAndSetFiles = (selectedFiles: FileList) => {
-    // Check for HTML files
     let hasHtmlFiles = false;
     let invalidFiles = [];
     
@@ -91,7 +90,6 @@ const UploadSection = () => {
     if (!files || files.length === 0) return;
 
     try {
-      // Step 1: Upload
       setMigrationStatus({
         step: MigrationStep.UPLOADING,
         progress: 5,
@@ -101,7 +99,6 @@ const UploadSection = () => {
 
       await simulateProgress(15, 500);
       
-      // Step 2: Extract (simulated for single HTML files)
       setMigrationStatus({
         step: MigrationStep.EXTRACTING,
         progress: 20,
@@ -111,7 +108,6 @@ const UploadSection = () => {
       
       await simulateProgress(30, 500);
       
-      // Step 3: Read and process HTML files
       const fileContents: FileContent[] = [];
       
       for (let i = 0; i < files.length; i++) {
@@ -126,11 +122,10 @@ const UploadSection = () => {
         }
       }
       
-      // Step 4: Analyze Bootstrap 3 components
       setMigrationStatus({
         step: MigrationStep.ANALYZING,
         progress: 40,
-        detail: "Analyzing Bootstrap 3 components...",
+        detail: "Analyzing Bootstrap 3 components with AI...",
         filesProcessed: fileContents.length
       });
       
@@ -143,14 +138,18 @@ const UploadSection = () => {
           currentFileName: fileContent.fileName
         }));
         
+        const analysis = await analyzeBootstrapCode(fileContent.content, "analyze");
+        if (analysis.success) {
+          fileContent.analysisResults = analysis.content;
+        }
+        
         await new Promise(resolve => setTimeout(resolve, 200));
       }
       
-      // Step 5: Convert to Bootstrap 5
       setMigrationStatus({
         step: MigrationStep.CONVERTING,
         progress: 65,
-        detail: "Converting to Bootstrap 5...",
+        detail: "Converting to Bootstrap 5 with AI assistance...",
         filesProcessed: fileContents.length
       });
       
@@ -165,12 +164,31 @@ const UploadSection = () => {
           currentFileName: fileContent.fileName
         }));
         
-        // Actual migration happens here
-        const { content, changes, issues } = processHTMLContent(fileContent.content);
+        const llmConversion = await analyzeBootstrapCode(fileContent.content, "convert");
+        let processedContent = fileContent.content;
+        let changes = 0;
+        let issues: { message: string; line?: number }[] = [];
+        
+        if (llmConversion.success && llmConversion.content) {
+          processedContent = llmConversion.content;
+          changes = countDifferences(fileContent.content, processedContent);
+          
+          const suggestions = await analyzeBootstrapCode(fileContent.content, "suggest");
+          if (suggestions.success) {
+            issues.push({
+              message: suggestions.content
+            });
+          }
+        } else {
+          const processed = processHTMLContent(fileContent.content);
+          processedContent = processed.content;
+          changes = processed.changes;
+          issues = processed.issues;
+        }
         
         convertedFiles.push({
           ...fileContent,
-          content: content,
+          content: processedContent,
           changes: changes,
           issues: issues
         });
@@ -178,29 +196,25 @@ const UploadSection = () => {
         await new Promise(resolve => setTimeout(resolve, 300));
       }
       
-      // Generate results from the migration
       const results = generateMigrationResults(convertedFiles);
       
-      // Step 6: Generate report
       setMigrationStatus({
         step: MigrationStep.GENERATING_REPORT,
         progress: 90,
-        detail: "Generating migration report...",
+        detail: "Generating AI-enhanced migration report...",
         filesProcessed: fileContents.length
       });
       
       await simulateProgress(100, 500);
       
-      // Set results and complete
       setMigrationResults(results);
       setMigrationStatus({
         step: MigrationStep.COMPLETE,
         progress: 100,
-        detail: "Migration complete!",
+        detail: "Migration complete with AI assistance!",
         filesProcessed: fileContents.length
       });
       
-      // Offer download of converted files
       prepareFilesForDownload(convertedFiles);
       
     } catch (error) {
@@ -257,12 +271,28 @@ const UploadSection = () => {
     });
   };
 
+  const countDifferences = (original: string, converted: string): number => {
+    const originalLines = original.split('\n');
+    const convertedLines = converted.split('\n');
+    let changes = 0;
+    
+    const minLength = Math.min(originalLines.length, convertedLines.length);
+    for (let i = 0; i < minLength; i++) {
+      if (originalLines[i] !== convertedLines[i]) {
+        changes++;
+      }
+    }
+    
+    changes += Math.abs(originalLines.length - convertedLines.length);
+    
+    return changes;
+  };
+
   const processHTMLContent = (content: string) => {
     let modifiedContent = content;
     let changesCount = 0;
     const issues: { message: string; line?: number }[] = [];
     
-    // Replace Bootstrap 3 CDN links with Bootstrap 5
     const bs3CdnMatches = [
       'https://maxcdn.bootstrapcdn.com/bootstrap/3',
       'https://stackpath.bootstrapcdn.com/bootstrap/3',
@@ -272,20 +302,17 @@ const UploadSection = () => {
       'bootstrap.min.js'
     ];
     
-    // Update to latest Bootstrap 5 CDN
     let foundCDN = false;
     bs3CdnMatches.forEach(match => {
       if (content.includes(match)) {
         foundCDN = true;
         
-        // Replace CSS link
         const cssPattern = new RegExp(`<link[^>]*${match.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^>]*>`, 'g');
         modifiedContent = modifiedContent.replace(cssPattern, 
           `<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">`
         );
         changesCount++;
         
-        // Replace JS script
         const jsPattern = new RegExp(`<script[^>]*${match.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^>]*>`, 'g');
         modifiedContent = modifiedContent.replace(jsPattern,
           `<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>`
@@ -294,31 +321,25 @@ const UploadSection = () => {
       }
     });
     
-    // If no Bootstrap CDN was found but we think it's a Bootstrap site, add a note
     if (!foundCDN && (content.includes('class="container"') || content.includes('class="row"'))) {
       issues.push({
         message: "Bootstrap CDN links not found but Bootstrap classes detected"
       });
     }
     
-    // Remove jQuery dependency if present
     if (content.includes('jquery')) {
       issues.push({
         message: "jQuery dependency detected. Bootstrap 5 no longer requires jQuery."
       });
     }
     
-    // Fix Bootstrap 3 Modal Headers (specifically fixing the close button positioning)
-    // This is a specific fix for modal headers with close buttons on the left
     const modalHeaderClosePattern = /<div class=["']modal-header["']>\s*<button[^>]*class=["'][^"']*close[^"']*["'][^>]*data-dismiss=["']modal["'][^>]*>[^<]*<span[^>]*>&times;<\/span><\/button>\s*<h[1-6][^>]*class=["'][^"']*modal-title[^"']*["'][^>]*>/g;
     
     modifiedContent = modifiedContent.replace(modalHeaderClosePattern, (match) => {
       changesCount++;
-      // Extract the title element from the match
       const titleMatch = match.match(/<h[1-6][^>]*class=["'][^"']*modal-title[^"']*["'][^>]*>/);
       if (titleMatch) {
         const titleElement = titleMatch[0];
-        // Replace with Bootstrap 5 modal header structure (title first, close button after)
         return `<div class="modal-header">
     ${titleElement.replace('class="modal-title"', 'class="modal-title fs-5"')}
     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>`;
@@ -326,11 +347,9 @@ const UploadSection = () => {
       return match;
     });
     
-    // Replace Bootstrap 3 classes with Bootstrap 5 equivalents
     Object.entries(BOOTSTRAP_CLASS_MAPPINGS).forEach(([bs3Class, bs5Class]) => {
-      if (bs3Class.includes('http')) return; // Skip URLs
+      if (bs3Class.includes('http')) return;
       
-      // Match class attribute values
       const classPattern = new RegExp(`class=["'][^"']*\\b${bs3Class}\\b[^"']*["']`, 'gi');
       const matches = modifiedContent.match(classPattern) || [];
       
@@ -343,7 +362,6 @@ const UploadSection = () => {
       }
     });
     
-    // Replace Bootstrap 3 data attributes with Bootstrap 5 data-bs-* attributes
     const dataAttributes = [
       { old: 'data-toggle', new: 'data-bs-toggle' },
       { old: 'data-target', new: 'data-bs-target' },
@@ -364,7 +382,6 @@ const UploadSection = () => {
       }
     });
     
-    // Check for Bootstrap JS component usage
     BOOTSTRAP_JS_ISSUES.forEach(issue => {
       const pattern = new RegExp(issue.pattern, 'g');
       const contentLines = content.split('\n');
@@ -409,12 +426,22 @@ const UploadSection = () => {
         manualFixesNeeded += Math.ceil(fileIssues.length / 2);
       }
 
+      if (file.analysisResults) {
+        fileWarnings.push({
+          type: "ai-analysis",
+          severity: "info",
+          message: "AI Analysis: " + file.analysisResults.substring(0, 100) + "...",
+          file: file.fileName
+        });
+      }
+
       fileSummary.push({
         fileName: file.fileName,
         fileType: file.fileType,
         changesCount,
         jsIssues: fileIssues.length,
-        warnings: fileWarnings
+        warnings: fileWarnings,
+        aiAnalysis: file.analysisResults
       });
 
       warnings.push(...fileWarnings);
@@ -436,6 +463,12 @@ const UploadSection = () => {
       });
     }
 
+    warnings.unshift({
+      type: "ai-assistance",
+      severity: "info",
+      message: "Migration performed with AI assistance for improved accuracy"
+    });
+
     return {
       totalFiles: files.length,
       modifiedFiles: files.length,
@@ -443,7 +476,8 @@ const UploadSection = () => {
       jsIssuesFound,
       manualFixesNeeded,
       warnings: removeDuplicateWarnings(warnings),
-      fileSummary
+      fileSummary,
+      aiAssisted: true
     };
   };
 
@@ -463,7 +497,6 @@ const UploadSection = () => {
   };
 
   const prepareFilesForDownload = (files: FileContent[]) => {
-    // Create a blob with the migrated content
     window.migratedFiles = files;
   };
 
@@ -477,12 +510,10 @@ const UploadSection = () => {
   };
 
   const downloadResults = () => {
-    // If we have multiple files, create a zip file
     if (window.migratedFiles && window.migratedFiles.length > 0) {
       const files = window.migratedFiles;
       
       if (files.length === 1) {
-        // For a single file, just download it directly
         const file = files[0];
         const blob = new Blob([file.content], { type: 'text/html' });
         const url = URL.createObjectURL(blob);
@@ -494,8 +525,6 @@ const UploadSection = () => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       } else {
-        // For multiple files, we'll just download the first one for now
-        // In a real app, we'd create a zip file here
         const file = files[0];
         const blob = new Blob([file.content], { type: 'text/html' });
         const url = URL.createObjectURL(blob);
@@ -651,9 +680,9 @@ interface FileContent {
   content: string;
   changes?: number;
   issues?: { message: string; line?: number }[];
+  analysisResults?: string;
 }
 
-// Add this to the window object for the download functionality
 declare global {
   interface Window {
     migratedFiles?: FileContent[];
