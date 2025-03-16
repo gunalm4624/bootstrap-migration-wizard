@@ -71,7 +71,7 @@ async function callOpenAIAPI(prompt: string, promptType: "analyze" | "convert" |
   try {
     // In a production app, this should be handled by a server-side API to protect API keys
     // For demo purposes, we're using a frontend approach
-    const apiKey = localStorage.getItem('openai_api_key');
+    const apiKey = localStorage.getItem('openai_api_key') || "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";
     
     if (!apiKey) {
       // If no API key, show an input to collect it
@@ -210,6 +210,16 @@ function convertBootstrapModal(html: string): string {
   convertedHTML = convertedHTML.replace(/class=["']([^"']*)navbar-toggle([^"']*)["']/g, 'class="$1navbar-toggler$2"');
   convertedHTML = convertedHTML.replace(/class=["']([^"']*)nav-stacked([^"']*)["']/g, 'class="$1flex-column$2"');
   
+  // Fix link elements (a tags with Bootstrap classes)
+  convertedHTML = convertedHTML.replace(/<a([^>]*)class=["']([^"']*)(btn-default)([^"']*)["']([^>]*)>/g, '<a$1class="$2btn-secondary$4"$5>');
+  convertedHTML = convertedHTML.replace(/<a([^>]*)class=["']([^"']*)(navbar-brand)([^"']*)["']([^>]*)>/g, '<a$1class="$2navbar-brand$4"$5>');
+  
+  // Fix special cases for links in navbars
+  convertedHTML = convertedHTML.replace(/<ul class=["']nav navbar-nav["']/g, '<ul class="navbar-nav">');
+  convertedHTML = convertedHTML.replace(/<li([^>]*)class=["']([^"']*)active([^"']*)["']([^>]*)>/g, '<li$1class="$2active nav-item$3"$4>');
+  convertedHTML = convertedHTML.replace(/<li([^>]*)>/g, '<li$1 class="nav-item">');
+  convertedHTML = convertedHTML.replace(/<a([^>]*)class=["']([^"']*)"([^>]*)>/g, '<a$1class="$2 nav-link"$3>');
+  
   return convertedHTML;
 }
 
@@ -247,6 +257,19 @@ function analyzeBootstrapIssues(html: string): string[] {
   const modalHeaderClosePattern = /<div class=["']modal-header["']>[\s\S]*?<button[\s\S]*?class=["'][^"']*close[^"']*["'][\s\S]*?data-dismiss=["']modal["'][\s\S]*?>[\s\S]*?<\/button>[\s\S]*?<h\d/;
   if (modalHeaderClosePattern.test(html)) {
     issues.push("Modal header has close button before title - Bootstrap 5 places title first, then close button");
+  }
+  
+  // Check for link-specific issues
+  if (html.includes('<ul class="nav navbar-nav"')) {
+    issues.push("'nav navbar-nav' should be replaced with 'navbar-nav'");
+  }
+  
+  if (html.includes('<li class="active"')) {
+    issues.push("List items in navbars should have 'nav-item' class alongside 'active'");
+  }
+  
+  if (html.includes('<a') && !html.includes('nav-link') && html.includes('navbar-nav')) {
+    issues.push("Links in navbar need 'nav-link' class in Bootstrap 5");
   }
   
   return issues;
