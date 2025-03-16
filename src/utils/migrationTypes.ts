@@ -1,3 +1,4 @@
+
 /**
  * Migration process steps
  */
@@ -128,8 +129,9 @@ export const BOOTSTRAP_CLASS_MAPPINGS = {
   "input-sm": "form-control-sm",
   
   // Buttons
-  "btn-default": "btn-light",
+  "btn-default": "btn-secondary",
   "btn-xs": "btn-sm",
+  "close": "btn-close",
   
   // Utilities
   "pull-left": "float-start",
@@ -163,6 +165,9 @@ export const BOOTSTRAP_CLASS_MAPPINGS = {
   // List groups
   "list-group-item-heading": "list-group-item-heading",
   "list-group-item-text": "list-group-item-text",
+  
+  // Modal classes
+  "modal-title": "modal-title fs-5",
   
   // Additional mappings
   "navbar-inverse": "navbar-dark bg-dark",

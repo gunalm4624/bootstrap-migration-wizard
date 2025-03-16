@@ -73,7 +73,7 @@ const UploadSection = () => {
     setIsDragOver(false);
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLDragEvent>) => {
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragOver(false);
     
@@ -297,18 +297,34 @@ const UploadSection = () => {
     // If no Bootstrap CDN was found but we think it's a Bootstrap site, add a note
     if (!foundCDN && (content.includes('class="container"') || content.includes('class="row"'))) {
       issues.push({
-        message: "Bootstrap CDN links not found but Bootstrap classes detected",
-        suggestion: "Consider adding Bootstrap 5 CDN links"
+        message: "Bootstrap CDN links not found but Bootstrap classes detected"
       });
     }
     
     // Remove jQuery dependency if present
     if (content.includes('jquery')) {
       issues.push({
-        message: "jQuery dependency detected. Bootstrap 5 no longer requires jQuery.",
-        suggestion: "Consider removing jQuery dependency and updating your JavaScript code."
+        message: "jQuery dependency detected. Bootstrap 5 no longer requires jQuery."
       });
     }
+    
+    // Fix Bootstrap 3 Modal Headers (specifically fixing the close button positioning)
+    // This is a specific fix for modal headers with close buttons on the left
+    const modalHeaderClosePattern = /<div class=["']modal-header["']>\s*<button[^>]*class=["'][^"']*close[^"']*["'][^>]*data-dismiss=["']modal["'][^>]*>[^<]*<span[^>]*>&times;<\/span><\/button>\s*<h[1-6][^>]*class=["'][^"']*modal-title[^"']*["'][^>]*>/g;
+    
+    modifiedContent = modifiedContent.replace(modalHeaderClosePattern, (match) => {
+      changesCount++;
+      // Extract the title element from the match
+      const titleMatch = match.match(/<h[1-6][^>]*class=["'][^"']*modal-title[^"']*["'][^>]*>/);
+      if (titleMatch) {
+        const titleElement = titleMatch[0];
+        // Replace with Bootstrap 5 modal header structure (title first, close button after)
+        return `<div class="modal-header">
+    ${titleElement.replace('class="modal-title"', 'class="modal-title fs-5"')}
+    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>`;
+      }
+      return match;
+    });
     
     // Replace Bootstrap 3 classes with Bootstrap 5 equivalents
     Object.entries(BOOTSTRAP_CLASS_MAPPINGS).forEach(([bs3Class, bs5Class]) => {
@@ -316,7 +332,7 @@ const UploadSection = () => {
       
       // Match class attribute values
       const classPattern = new RegExp(`class=["'][^"']*\\b${bs3Class}\\b[^"']*["']`, 'gi');
-      const matches = content.match(classPattern) || [];
+      const matches = modifiedContent.match(classPattern) || [];
       
       if (matches.length > 0) {
         changesCount += matches.length;
@@ -357,8 +373,7 @@ const UploadSection = () => {
         if (pattern.test(line)) {
           issues.push({
             message: issue.message,
-            line: index + 1,
-            suggestion: "Update to Bootstrap 5 JavaScript syntax"
+            line: index + 1
           });
         }
       });
@@ -385,8 +400,7 @@ const UploadSection = () => {
         severity: issue.message.includes("jQuery") ? "warning" : "info",
         message: issue.message,
         file: file.fileName,
-        line: issue.line,
-        suggestion: issue.suggestion || "Consider updating to Bootstrap 5 standards"
+        line: issue.line
       })));
 
       totalClassesReplaced += changesCount;
@@ -410,8 +424,7 @@ const UploadSection = () => {
       warnings.unshift({
         type: "javascript",
         severity: "warning",
-        message: `jQuery dependency found in ${Math.min(files.length, jsIssuesFound)} files`,
-        suggestion: "Consider replacing jQuery with native JavaScript"
+        message: `jQuery dependency found in ${Math.min(files.length, jsIssuesFound)} files`
       });
     }
 
@@ -419,8 +432,7 @@ const UploadSection = () => {
       warnings.unshift({
         type: "structure",
         severity: "info",
-        message: "Bootstrap 5 uses different grid breakpoints",
-        suggestion: "Review your layouts for potential breakpoint issues"
+        message: "Bootstrap 5 uses different grid breakpoints"
       });
     }
 
@@ -638,7 +650,7 @@ interface FileContent {
   fileType: string;
   content: string;
   changes?: number;
-  issues?: { message: string; line?: number; suggestion?: string }[];
+  issues?: { message: string; line?: number }[];
 }
 
 // Add this to the window object for the download functionality
